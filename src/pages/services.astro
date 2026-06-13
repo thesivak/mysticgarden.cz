@@ -1,0 +1,72 @@
+---
+import { getCollection, getEntry } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Inquiry from '../components/Inquiry.astro';
+
+const home = await getEntry('pages', 'home');
+if (!home) {
+  throw new Error('Missing src/content/pages/home.md');
+}
+
+const services = (await getCollection('services'))
+  .filter((service) => service.data.active)
+  .sort((a, b) => a.data.sortOrder - b.data.sortOrder);
+
+const canonical = new URL('/services/', Astro.site).toString();
+const jsonLd = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: 'Služby Mystic Garden',
+    url: canonical,
+    inLanguage: 'cs',
+    mainEntity: services.map((service) => ({
+      '@type': 'Service',
+      name: service.data.title,
+      description: service.data.description,
+      provider: {
+        '@type': 'LocalBusiness',
+        name: 'Mystic Garden',
+      },
+      areaServed: 'Czech Republic',
+    })),
+  },
+];
+---
+
+<BaseLayout
+  title="Služby | Mystic Garden"
+  description="Přehled služeb Mystic Garden: návrhy zahrad, ekologický design, historické zahrady, biodiverzita a sezónní zahradničení."
+  keywords={home.data.seo.keywords}
+  ogImage={home.data.seo.ogImage}
+  contact={home.data.contact}
+  jsonLd={jsonLd}
+>
+  <section class="relative overflow-hidden bg-green-950 px-6 pb-20 pt-36 text-white md:pt-44">
+    <div class="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
+      <div>
+        <p class="text-sm font-semibold uppercase tracking-[0.22em] text-mystic">Mystic Garden</p>
+        <h1 class="mt-5 text-5xl font-semibold leading-tight md:text-7xl">Služby pro zahrady s atmosférou</h1>
+      </div>
+      <p class="max-w-2xl text-lg leading-8 text-white/78 md:text-xl">
+        Navrhujeme venkovní prostory, které propojují estetiku, funkčnost a přirozený rytmus místa. Každá služba vychází z detailní konzultace, citlivého návrhu a udržitelného přístupu k výsadbě.
+      </p>
+    </div>
+  </section>
+
+  <section id="services" class="bg-white px-6 py-20">
+    <div class="mx-auto grid max-w-7xl gap-8 md:grid-cols-2 xl:grid-cols-3">
+      {services.map((service) => (
+        <article class="overflow-hidden rounded-lg border border-green-950/10 bg-white shadow-sm">
+          <img src={service.data.image} alt={service.data.imageAlt} class="aspect-[4/3] w-full object-cover" loading="lazy" />
+          <div class="p-6">
+            <h2 class="text-2xl font-semibold text-green-950">{service.data.title}</h2>
+            <p class="mt-4 text-base leading-7 text-gray-600">{service.data.description}</p>
+          </div>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <Inquiry inquiry={home.data.inquiry} />
+</BaseLayout>
