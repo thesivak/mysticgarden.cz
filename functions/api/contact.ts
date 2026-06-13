@@ -43,6 +43,7 @@ const limits: Record<keyof Omit<FormValues, 'turnstileToken'>, number> = {
 
 const rateLimitWindowMs = 10 * 60 * 1000;
 const defaultRateLimitMax = 5;
+const allowedTurnstileHostnames = new Set(['mysticgarden.cz', 'www.mysticgarden.cz']);
 const attempts = new Map<string, number[]>();
 
 const json = (body: Record<string, unknown>, status = 200) =>
@@ -93,8 +94,10 @@ const verifyTurnstile = async (token: string, secret: string, ip: string) => {
     method: 'POST',
     body,
   });
-  const result = await response.json<{ success?: boolean }>().catch(() => ({ success: false }));
-  return result.success === true;
+  const result: { success?: boolean; hostname?: string } = await response
+    .json<{ success?: boolean; hostname?: string }>()
+    .catch(() => ({ success: false }));
+  return result.success === true && Boolean(result.hostname && allowedTurnstileHostnames.has(result.hostname));
 };
 
 const readForm = async (request: Request): Promise<FormValues | null> => {

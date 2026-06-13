@@ -80,9 +80,15 @@ const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? '';
     message?: string;
   };
 
+  type TurnstileApi = {
+    getResponse: (container?: Element) => string;
+    reset: (container?: Element) => void;
+  };
+
   const form = document.getElementById('inquiry-form') as HTMLFormElement | null;
   const notice = document.getElementById('form-notification');
   const submitLabel = document.querySelector('[data-submit-label]');
+  const turnstileContainer = document.querySelector('.cf-turnstile');
 
   const showMessage = (message: string, ok: boolean) => {
     if (!notice) return;
@@ -94,6 +100,15 @@ const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? '';
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const submitButton = form.querySelector('button[type="submit"]') as HTMLButtonElement | null;
+
+    if (turnstileContainer) {
+      const turnstile = (window as Window & { turnstile?: TurnstileApi }).turnstile;
+      if (!turnstile?.getResponse(turnstileContainer)) {
+        showMessage('Potvrďte prosím ověření formuláře.', false);
+        return;
+      }
+    }
+
     submitButton?.setAttribute('disabled', 'true');
     if (submitLabel) submitLabel.textContent = 'Odesílání...';
 
@@ -110,7 +125,7 @@ const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? '';
       }
 
       form.reset();
-      (window as Window & { turnstile?: { reset: () => void } }).turnstile?.reset();
+      (window as Window & { turnstile?: TurnstileApi }).turnstile?.reset(turnstileContainer ?? undefined);
       showMessage(data.message || 'Děkujeme, poptávku jsme přijali.', true);
     } catch {
       showMessage('Došlo k chybě při odesílání. Zkuste to prosím znovu.', false);
