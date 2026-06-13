@@ -1,0 +1,222 @@
+interface Env {
+  RESEND_API_KEY: string;
+  CONTACT_TO_EMAIL: string;
+  CONTACT_FROM_EMAIL: string;
+  TURNSTILE_SECRET_KEY: string;
+  CONTACT_RATE_LIMIT?: string;
+}
+
+type FormValues = {
+  name: string;
+  email: string;
+  phone: string;
+  message: string;
+  serviceType: string;
+  location: string;
+  preferredContact: string;
+  website: string;
+  turnstileToken: string;
+};
+
+const allowedFields = new Set([
+  'name',
+  'email',
+  'phone',
+  'message',
+  'serviceType',
+  'location',
+  'preferredContact',
+  'website',
+  'cf-turnstile-response',
+]);
+
+const limits: Record<keyof Omit<FormValues, 'turnstileToken'>, number> = {
+  name: 120,
+  email: 180,
+  phone: 40,
+  message: 3000,
+  serviceType: 80,
+  location: 160,
+  preferredContact: 20,
+  website: 120,
+};
+
+const rateLimitWindowMs = 10 * 60 * 1000;
+const defaultRateLimitMax = 5;
+const attempts = new Map<string, number[]>();
+
+const json = (body: Record<string, unknown>, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+    },
+  });
+
+const genericError = () => json({ success: false, message: 'Došlo k chybě při odesílání. Zkuste to prosím znovu.' }, 400);
+
+const stripControlCharacters = (value: string) => value.replace(/[\u0000-\u001f\u007f]/g, '').trim();
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+const isEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+const clientIp = (request: Request) =>
+  request.headers.get('cf-connecting-ip') ||
+  request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+  'unknown';
+
+const isRateLimited = (key: string, limit = defaultRateLimitMax) => {
+  const now = Date.now();
+  const recent = (attempts.get(key) ?? []).filter((timestamp) => now - timestamp < rateLimitWindowMs);
+  recent.push(now);
+  attempts.set(key, recent);
+  return recent.length > limit;
+};
+
+const verifyTurnstile = async (token: string, secret: string, ip: string) => {
+  if (!token || !secret) return false;
+
+  const body = new URLSearchParams();
+  body.set('secret', secret);
+  body.set('response', token);
+  if (ip !== 'unknown') body.set('remoteip', ip);
+
+  const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+    method: 'POST',
+    body,
+  });
+  const result = await response.json<{ success?: boolean }>().catch(() => ({ success: false }));
+  return result.success === true;
+};
+
+const readForm = async (request: Request): Promise<FormValues | null> => {
+  const formData = await request.formData();
+  for (const [key, value] of formData.entries()) {
+    if (!allowedFields.has(key) || typeof value !== 'string') return null;
+  }
+
+  const value = (key: keyof Omit<FormValues, 'turnstileToken'>) => {
+    const raw = String(formData.get(key) ?? '');
+    return stripControlCharacters(raw).slice(0, limits[key]);
+  };
+
+  return {
+    name: value('name'),
+    email: value('email'),
+    phone: value('phone'),
+    message: value('message'),
+    serviceType: value('serviceType'),
+    location: value('location'),
+    preferredContact: value('preferredContact'),
+    website: value('website'),
+    turnstileToken: stripControlCharacters(String(formData.get('cf-turnstile-response') ?? '')),
+  };
+};
+
+const validate = (values: FormValues) => {
+  if (values.website) return false;
+  if (!values.name || !values.message) return false;
+  if (!values.email && !values.phone) return false;
+  if (values.email && !isEmail(values.email)) return false;
+  if (values.preferredContact && !['email', 'phone'].includes(values.preferredContact)) return false;
+  return true;
+};
+
+const emailHtml = (values: FormValues) => {
+  const rows = [
+    ['Jméno', values.name],
+    ['Email', values.email],
+    ['Telefon', values.phone],
+    ['Typ služby', values.serviceType],
+    ['Lokalita', values.location],
+    ['Preferovaný kontakt', values.preferredContact],
+    ['Poptávka', values.message.replace(/\n/g, '<br>')],
+  ].filter(([, value]) => value);
+
+  return `
+    <h1>Nová poptávka z mysticgarden.cz</h1>
+    <table cellpadding="8" cellspacing="0" border="0">
+      ${rows
+        .map(([label, value]) => `<tr><th align="left">${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`)
+        .join('')}
+    </table>
+  `;
+};
+
+const sendEmail = async (values: FormValues, env: Env) => {
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${env.RESEND_API_KEY}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: env.CONTACT_FROM_EMAIL,
+      to: [env.CONTACT_TO_EMAIL],
+      reply_to: values.email || undefined,
+      subject: `Nová poptávka: ${values.name}`,
+      html: emailHtml(values),
+      text: [
+        `Jméno: ${values.name}`,
+        values.email ? `Email: ${values.email}` : '',
+        values.phone ? `Telefon: ${values.phone}` : '',
+        values.serviceType ? `Typ služby: ${values.serviceType}` : '',
+        values.location ? `Lokalita: ${values.location}` : '',
+        values.preferredContact ? `Preferovaný kontakt: ${values.preferredContact}` : '',
+        '',
+        values.message,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    }),
+  });
+
+  return response.ok;
+};
+
+export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+  const ip = clientIp(request);
+
+  try {
+    const rateLimit = Number.parseInt(env.CONTACT_RATE_LIMIT ?? '', 10) || defaultRateLimitMax;
+    if (isRateLimited(ip, rateLimit)) return genericError();
+
+    const values = await readForm(request);
+    if (!values || !validate(values)) return genericError();
+
+    const turnstileOk = await verifyTurnstile(values.turnstileToken, env.TURNSTILE_SECRET_KEY, ip);
+    if (!turnstileOk) return genericError();
+
+    if (!env.RESEND_API_KEY || !env.CONTACT_TO_EMAIL || !env.CONTACT_FROM_EMAIL) {
+      console.error('Missing contact form email environment variables.');
+      return genericError();
+    }
+
+    const emailSent = await sendEmail(values, env);
+    if (!emailSent) return genericError();
+
+    return json({ success: true, message: 'Děkujeme, poptávku jsme přijali.' });
+  } catch (error) {
+    console.error('Contact form submission failed.', {
+      ip,
+      error: error instanceof Error ? error.message : 'unknown',
+    });
+    return genericError();
+  }
+};
+
+const methodNotAllowed: PagesFunction<Env> = async () =>
+  json({ success: false, message: 'Method not allowed.' }, 405);
+
+export const onRequestGet = methodNotAllowed;
+export const onRequestPut = methodNotAllowed;
+export const onRequestPatch = methodNotAllowed;
+export const onRequestDelete = methodNotAllowed;

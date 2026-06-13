@@ -1,0 +1,93 @@
+---
+interface Props {
+  contact: {
+    addresses: string[];
+    billingAddress: string;
+    companyId: string;
+    taxId: string;
+    facebook: string;
+    instagram: string;
+  };
+}
+
+const { contact } = Astro.props;
+const links = [
+  ['hero', 'Úvod'],
+  ['specialties', 'O nás'],
+  ['process', 'Jak pracujeme'],
+  ['services', 'Služby'],
+  ['inquiry', 'Kontakt'],
+];
+const instagramImages = [
+  'https://images.pexels.com/photos/2132227/pexels-photo-2132227.jpeg?auto=compress&cs=tinysrgb&dpr=1&w=300&h=300&fit=crop',
+  'https://images.pexels.com/photos/931177/pexels-photo-931177.jpeg?auto=compress&cs=tinysrgb&dpr=1&w=300&h=300&fit=crop',
+  'https://images.pexels.com/photos/462118/pexels-photo-462118.jpeg?auto=compress&cs=tinysrgb&dpr=1&w=300&h=300&fit=crop',
+  'https://images.pexels.com/photos/158028/bellingrath-gardens-alabama-landscape-scenic-158028.jpeg?auto=compress&cs=tinysrgb&dpr=1&w=300&h=300&fit=crop',
+  'https://images.pexels.com/photos/931154/pexels-photo-931154.jpeg?auto=compress&cs=tinysrgb&dpr=1&w=300&h=300&fit=crop',
+  'https://images.pexels.com/photos/931178/pexels-photo-931178.jpeg?auto=compress&cs=tinysrgb&dpr=1&w=300&h=300&fit=crop',
+];
+---
+
+<footer class="bg-green-950 pb-8 pt-36 text-white">
+  <div class="mx-auto max-w-7xl px-6">
+    <div class="grid grid-cols-1 gap-8 md:grid-cols-4">
+      <div class="space-y-4">
+        <img src="/images/logo.svg" alt="Mystic Garden Logo" class="h-16 w-auto" width="166" height="65" />
+        <p>V Mystic Garden tvoříme prostory, které vyprávějí svůj příběh</p>
+        <div class="mt-6 flex space-x-6">
+          <a href={contact.facebook} target="_blank" rel="noopener noreferrer" class="hover:text-mystic">Facebook</a>
+          <a href={contact.instagram} target="_blank" rel="noopener noreferrer" class="hover:text-mystic">Instagram</a>
+        </div>
+      </div>
+
+      <div class="block h-px w-full bg-green-800 md:hidden"></div>
+
+      <div>
+        <h3 class="mb-4 text-xl font-semibold">Odkazy</h3>
+        <ul class="grid grid-cols-2 gap-x-4 gap-y-2 md:grid-cols-1">
+          {links.map(([id, label]) => (
+            <li><a href={`/#${id}`} class="hover:text-green-400">{label}</a></li>
+          ))}
+        </ul>
+      </div>
+
+      <div class="block h-px w-full bg-green-800 md:hidden"></div>
+
+      <div>
+        <h3 class="mb-4 text-xl font-semibold">Instagram</h3>
+        <div class="grid max-w-[200px] grid-cols-3 gap-1">
+          {instagramImages.map((image) => (
+            <a href={contact.instagram} target="_blank" rel="noopener noreferrer">
+              <div class="aspect-square overflow-hidden rounded">
+                <img src={image} alt="Zahrada Instagram" class="h-full w-full object-cover transition-transform duration-300 hover:scale-110" loading="lazy" />
+              </div>
+            </a>
+          ))}
+        </div>
+      </div>
+
+      <div class="block h-px w-full bg-green-800 md:hidden"></div>
+
+      <div>
+        <h3 class="mb-4 text-xl font-semibold">Kontakty</h3>
+        <ul class="space-y-3">
+          <li>
+            {contact.addresses.map((address) => <p>{address}</p>)}
+          </li>
+          <li>
+            <p>Fakturační adresa:</p>
+            <p>{contact.billingAddress}</p>
+          </li>
+          <li>
+            <p>IČ: {contact.companyId}</p>
+            <p>DIČ: {contact.taxId}</p>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="mt-12 border-t border-green-800 pt-8 text-center text-sm">
+      <p>© Mystic Garden. Všechna práva vyhrazena.</p>
+    </div>
+  </div>
+</footer>

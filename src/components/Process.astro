@@ -1,0 +1,37 @@
+---
+interface Step {
+  body?: string;
+  data: {
+    title: string;
+    stepNumber: number;
+    image: string;
+    imageAlt: string;
+  };
+}
+
+interface Props {
+  heading: string;
+  steps: Step[];
+}
+
+const { heading, steps } = Astro.props;
+---
+
+<section id="process" class="bg-green-950 py-16 text-mystic">
+  <div class="mx-auto w-full max-w-7xl px-6">
+    <h2 class="mb-16 text-center text-4xl font-semibold text-mystic">{heading}</h2>
+
+    <div class="grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-4">
+      {steps.map((step) => (
+        <div class="flex flex-col items-center" data-aos="fade-up">
+          <img src={step.data.image} alt={step.data.imageAlt} class="mb-2 h-52 w-auto" loading="lazy" />
+          <div>
+            <div class="mb-2 text-2xl font-semibold">{String(step.data.stepNumber).padStart(2, '0')}</div>
+            <h3 class="mb-4 text-xl font-semibold">{step.data.title}</h3>
+            {step.body?.trim() && <p class="text-mystic/80">{step.body}</p>}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>

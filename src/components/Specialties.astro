@@ -1,0 +1,66 @@
+---
+interface Specialty {
+  data: {
+    title: string;
+    description: string;
+    image: string;
+    imageAlt: string;
+    imagePosition: string;
+  };
+}
+
+interface Props {
+  specialties: Specialty[];
+  about: {
+    titleLine1: string;
+    titleLine2: string;
+    titleLine3?: string;
+    description: string;
+  };
+}
+
+const { specialties, about } = Astro.props;
+---
+
+<section id="specialties" class="bg-white py-16">
+  <div class="z-10 mx-auto max-w-7xl px-6 md:-mt-56">
+    <div class="grid grid-cols-1 gap-8 md:grid-cols-3">
+      {specialties.map((specialty, index) => (
+        <div data-aos="fade-up" style={`transition-delay:${index * 100}ms`}>
+          <div class="group">
+            <div class="relative h-80 overflow-hidden rounded-lg shadow-lg transition-transform duration-300 group-hover:scale-[1.02]">
+              <img
+                src={specialty.data.image}
+                alt={specialty.data.imageAlt}
+                class="h-full w-full object-cover"
+                style={`object-position: ${specialty.data.imagePosition};`}
+                loading="lazy"
+              />
+              <div class="absolute bottom-0 left-0 right-0 bg-black/70 p-4">
+                <h3 class="text-center text-lg font-semibold text-mystic">{specialty.data.title}</h3>
+                {specialty.data.description && (
+                  <p class="mt-2 line-clamp-3 text-center text-sm text-white opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                    {specialty.data.description}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    <div id="about" class="mt-24 grid grid-cols-1 items-center gap-12 md:grid-cols-2">
+      <div data-aos="fade-right">
+        <h2 class="mb-6 text-4xl font-semibold text-green-950">
+          <span class="block">{about.titleLine1}</span>
+          <span class="block">{about.titleLine2}</span>
+          {about.titleLine3 && <span class="block">{about.titleLine3}</span>}
+        </h2>
+      </div>
+      <div data-aos="fade-left">
+        <p class="mb-6 text-xl text-gray-700">{about.description}</p>
+      </div>
+    </div>
+  </div>
+</section>

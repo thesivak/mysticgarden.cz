@@ -1,0 +1,58 @@
+---
+import { getCollection, getEntry, render } from 'astro:content';
+import BlogLayout from '../../layouts/BlogLayout.astro';
+import { hasMarkdownPosts } from '../../lib/blog';
+
+export async function getStaticPaths() {
+  if (!hasMarkdownPosts()) return [];
+
+  const posts = await getCollection('blog', ({ data }) => !data.draft);
+  return posts.map((post) => ({
+    params: { slug: post.id },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const home = await getEntry('pages', 'home');
+if (!home) throw new Error('Missing src/content/pages/home.md');
+
+const { Content } = await render(post);
+const canonical = new URL(`/blog/${post.id}/`, Astro.site).toString();
+const image = post.data.featuredImage ? new URL(post.data.featuredImage, Astro.site).toString() : undefined;
+const jsonLd = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: post.data.title,
+    description: post.data.seo.description,
+    url: canonical,
+    datePublished: post.data.publishedAt.toISOString(),
+    dateModified: (post.data.updatedAt ?? post.data.publishedAt).toISOString(),
+    image,
+    mainEntityOfPage: {
+      '@type': 'WebPage',
+      '@id': canonical,
+    },
+    author: {
+      '@type': 'Organization',
+      name: 'Mystic Garden',
+    },
+  },
+];
+---
+
+<BlogLayout
+  title={post.data.seo.title}
+  description={post.data.seo.description}
+  ogImage={post.data.featuredImage}
+  contact={home.data.contact}
+  jsonLd={jsonLd}
+>
+  {post.data.featuredImage && (
+    <img src={post.data.featuredImage} alt={post.data.featuredImageAlt ?? post.data.title} class="mb-10 aspect-[16/9] w-full rounded-lg object-cover" />
+  )}
+  <h1>{post.data.title}</h1>
+  <p class="text-sm text-gray-500">{post.data.publishedAt.toLocaleDateString('cs-CZ')}</p>
+  <Content />
+</BlogLayout>

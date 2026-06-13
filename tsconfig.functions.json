@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "allowJs": false,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "strict": true,
+    "target": "es2022",
+    "types": ["@cloudflare/workers-types"],
+    "lib": ["es2022"],
+    "skipLibCheck": true
+  },
+  "include": ["functions/**/*.ts"]
+}

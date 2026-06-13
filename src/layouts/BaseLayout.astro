@@ -1,0 +1,101 @@
+---
+import JsonLd from '../components/JsonLd.astro';
+import Navbar from '../components/Navbar.astro';
+import Seo from '../components/Seo.astro';
+import Footer from '../components/Footer.astro';
+import '../styles.css';
+
+interface Props {
+  title: string;
+  description: string;
+  keywords?: string[];
+  ogImage?: string;
+  contact: {
+    phone: string;
+    phoneHref: string;
+    addresses: string[];
+    billingAddress: string;
+    companyId: string;
+    taxId: string;
+    facebook: string;
+    instagram: string;
+  };
+  jsonLd: Record<string, unknown>[];
+}
+
+const { title, description, keywords = [], ogImage, contact, jsonLd } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site).toString();
+---
+
+<!doctype html>
+<html lang="cs">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <Seo title={title} description={description} keywords={keywords} ogImage={ogImage} canonical={canonical} />
+    <JsonLd data={jsonLd} />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+  </head>
+  <body class="antialiased">
+    <Navbar phone={contact.phone} phoneHref={contact.phoneHref} />
+    <main>
+      <slot />
+    </main>
+    <Footer contact={contact} />
+    <script>
+      const animateOnScroll = () => {
+        document.querySelectorAll('[data-aos]').forEach((element) => {
+          if (element.getBoundingClientRect().top < window.innerHeight * 0.9) {
+            element.classList.add('aos-animate');
+          }
+        });
+      };
+
+      const setNavbarState = () => {
+        const nav = document.getElementById('main-navbar');
+        if (!nav) return;
+        nav.classList.toggle('bg-black/60', window.scrollY > 20);
+        nav.classList.toggle('backdrop-blur-md', window.scrollY > 20);
+        nav.classList.toggle('shadow-lg', window.scrollY > 20);
+        nav.classList.toggle('bg-transparent', window.scrollY <= 20);
+      };
+
+      const setActiveNav = () => {
+        const sections = ['hero', 'specialties', 'process', 'services', 'inquiry'];
+        const current = sections.findLast((id) => {
+          const element = document.getElementById(id);
+          return element && element.getBoundingClientRect().top <= 120;
+        }) ?? 'hero';
+
+        document.querySelectorAll('[data-scroll-target]').forEach((link) => {
+          link.classList.toggle('is-active', link.getAttribute('data-scroll-target') === current);
+        });
+      };
+
+      const closeMobileMenu = () => {
+        document.getElementById('mobile-menu')?.classList.add('hidden');
+      };
+
+      document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(animateOnScroll, 100);
+        setNavbarState();
+        setActiveNav();
+
+        document.getElementById('mobile-menu-button')?.addEventListener('click', () => {
+          document.getElementById('mobile-menu')?.classList.toggle('hidden');
+        });
+
+        document.querySelectorAll('[data-scroll]').forEach((link) => {
+          link.addEventListener('click', closeMobileMenu);
+        });
+      });
+
+      window.addEventListener('scroll', () => {
+        animateOnScroll();
+        setNavbarState();
+        setActiveNav();
+      }, { passive: true });
+    </script>
+  </body>
+</html>

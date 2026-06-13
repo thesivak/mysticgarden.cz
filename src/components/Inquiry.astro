@@ -1,0 +1,122 @@
+---
+interface Props {
+  inquiry: {
+    heading: string;
+    image: string;
+    imageAlt: string;
+  };
+}
+
+const { inquiry } = Astro.props;
+const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? '';
+---
+
+<section id="inquiry" class="-mb-16 bg-white">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6">
+    <div class="flex flex-col md:flex-row">
+      <div class="w-full bg-mystic p-6 sm:p-8 md:w-1/2 md:p-12">
+        <h2 class="mb-6 text-2xl font-medium sm:text-3xl md:mb-8 md:text-4xl">{inquiry.heading}</h2>
+
+        <div class="space-y-6">
+          <div id="form-notification" class="hidden rounded-md p-4 text-sm font-medium"></div>
+
+          <form id="inquiry-form" class="space-y-6" novalidate>
+            <input type="text" name="website" tabindex="-1" autocomplete="off" class="hidden" aria-hidden="true" />
+
+            <div>
+              <input name="name" type="text" placeholder="Vaše jméno" class="mt-1 block w-full border border-mystic-secondary bg-transparent px-3 py-3 transition-colors duration-200 focus:outline-none" required maxlength="120" />
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <input name="email" type="email" placeholder="Váš email" class="block w-full border border-mystic-secondary bg-transparent px-3 py-3 transition-colors duration-200 focus:outline-none" maxlength="180" />
+              <input name="phone" type="tel" placeholder="Telefon" class="block w-full border border-mystic-secondary bg-transparent px-3 py-3 transition-colors duration-200 focus:outline-none" maxlength="40" />
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <select name="serviceType" class="block w-full border border-mystic-secondary bg-transparent px-3 py-3 transition-colors duration-200 focus:outline-none">
+                <option value="">Typ služby</option>
+                <option value="Projektování zahrad">Projektování zahrad</option>
+                <option value="Konzultace a poradenství">Konzultace a poradenství</option>
+                <option value="Realizace zahrady">Realizace zahrady</option>
+                <option value="Jiné">Jiné</option>
+              </select>
+              <select name="preferredContact" class="block w-full border border-mystic-secondary bg-transparent px-3 py-3 transition-colors duration-200 focus:outline-none">
+                <option value="">Kontaktovat přes</option>
+                <option value="email">Email</option>
+                <option value="phone">Telefon</option>
+              </select>
+            </div>
+
+            <input name="location" type="text" placeholder="Lokalita" class="block w-full border border-mystic-secondary bg-transparent px-3 py-3 transition-colors duration-200 focus:outline-none" maxlength="160" />
+
+            <div>
+              <textarea name="message" rows="4" placeholder="Vaše poptávka" class="mt-1 block w-full border border-mystic-secondary bg-transparent px-3 py-3 transition-colors duration-200 focus:outline-none" required maxlength="3000"></textarea>
+            </div>
+
+            {turnstileSiteKey ? (
+              <div class="cf-turnstile" data-sitekey={turnstileSiteKey}></div>
+            ) : (
+              <p class="text-sm text-green-950/70">Turnstile site key is not configured for this environment.</p>
+            )}
+
+            <button type="submit" class="flex w-full items-center justify-center rounded bg-mystic-secondary px-4 py-3 font-bold text-white transition-colors duration-200 hover:bg-mystic-secondary/80 disabled:cursor-not-allowed disabled:opacity-50">
+              <span data-submit-label>Odeslat</span>
+            </button>
+          </form>
+        </div>
+      </div>
+      <div class="h-60 w-full sm:h-80 md:h-auto md:w-1/2">
+        <img src={inquiry.image} alt={inquiry.imageAlt} class="h-full w-full object-cover object-bottom" loading="lazy" />
+      </div>
+    </div>
+  </div>
+</section>
+
+{turnstileSiteKey && <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
+
+<script>
+  type ContactResponse = {
+    success?: boolean;
+    message?: string;
+  };
+
+  const form = document.getElementById('inquiry-form') as HTMLFormElement | null;
+  const notice = document.getElementById('form-notification');
+  const submitLabel = document.querySelector('[data-submit-label]');
+
+  const showMessage = (message: string, ok: boolean) => {
+    if (!notice) return;
+    notice.textContent = message;
+    notice.className = `rounded-md p-4 text-sm font-medium ${ok ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`;
+    notice.classList.remove('hidden');
+  };
+
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const submitButton = form.querySelector('button[type="submit"]') as HTMLButtonElement | null;
+    submitButton?.setAttribute('disabled', 'true');
+    if (submitLabel) submitLabel.textContent = 'Odesílání...';
+
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        body: new FormData(form),
+      });
+      const data = await response.json().catch(() => ({})) as ContactResponse;
+
+      if (!response.ok || !data.success) {
+        showMessage(data.message || 'Došlo k chybě při odesílání. Zkuste to prosím znovu.', false);
+        return;
+      }
+
+      form.reset();
+      (window as Window & { turnstile?: { reset: () => void } }).turnstile?.reset();
+      showMessage(data.message || 'Děkujeme, poptávku jsme přijali.', true);
+    } catch {
+      showMessage('Došlo k chybě při odesílání. Zkuste to prosím znovu.', false);
+    } finally {
+      submitButton?.removeAttribute('disabled');
+      if (submitLabel) submitLabel.textContent = 'Odeslat';
+    }
+  });
+</script>

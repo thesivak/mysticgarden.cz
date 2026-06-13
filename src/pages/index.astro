@@ -1,0 +1,88 @@
+---
+import { getCollection, getEntry } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Hero from '../components/Hero.astro';
+import Inquiry from '../components/Inquiry.astro';
+import Process from '../components/Process.astro';
+import RecentBlog from '../components/RecentBlog.astro';
+import Services from '../components/Services.astro';
+import Specialties from '../components/Specialties.astro';
+import { hasMarkdownPosts } from '../lib/blog';
+
+const home = await getEntry('pages', 'home');
+if (!home) {
+  throw new Error('Missing src/content/pages/home.md');
+}
+
+const specialties = (await getCollection('specialties')).sort((a, b) => a.data.sortOrder - b.data.sortOrder);
+const processSteps = (await getCollection('process')).sort((a, b) => a.data.sortOrder - b.data.sortOrder);
+const services = (await getCollection('services'))
+  .filter((service) => service.data.active)
+  .sort((a, b) => a.data.sortOrder - b.data.sortOrder);
+const posts = hasMarkdownPosts()
+  ? (await getCollection('blog', ({ data }) => !data.draft))
+      .sort((a, b) => b.data.publishedAt.valueOf() - a.data.publishedAt.valueOf())
+      .slice(0, 3)
+  : [];
+
+const canonical = new URL('/', Astro.site).toString();
+const serviceJsonLd = services.map((service) => ({
+  '@context': 'https://schema.org',
+  '@type': 'Service',
+  name: service.data.title,
+  description: service.data.description,
+  provider: {
+    '@type': 'LocalBusiness',
+    name: 'Mystic Garden',
+  },
+  areaServed: 'Czech Republic',
+}));
+
+const jsonLd = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'Mystic Garden',
+    url: canonical,
+    logo: new URL('/images/logo.svg', Astro.site).toString(),
+    sameAs: [home.data.contact.facebook, home.data.contact.instagram],
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'LocalBusiness',
+    name: 'Mystic Garden',
+    url: canonical,
+    telephone: home.data.contact.phone,
+    image: new URL('/images/garden-background.jpg', Astro.site).toString(),
+    address: home.data.contact.addresses.map((streetAddress) => ({
+      '@type': 'PostalAddress',
+      streetAddress,
+      addressCountry: 'CZ',
+    })),
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'Mystic Garden',
+    url: canonical,
+    inLanguage: 'cs',
+  },
+  ...serviceJsonLd,
+];
+---
+
+<BaseLayout
+  title={home.data.seo.title}
+  description={home.data.seo.description}
+  keywords={home.data.seo.keywords}
+  ogImage={home.data.seo.ogImage}
+  contact={home.data.contact}
+  jsonLd={jsonLd}
+>
+  <Hero hero={home.data.hero} />
+  <Specialties specialties={specialties} about={home.data.about} />
+  <Process heading={home.data.process.heading} steps={processSteps} />
+  <Services heading={home.data.services.heading} services={services} />
+  <RecentBlog posts={posts} />
+  <Inquiry inquiry={home.data.inquiry} />
+</BaseLayout>

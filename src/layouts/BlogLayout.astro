@@ -1,0 +1,30 @@
+---
+import BaseLayout from './BaseLayout.astro';
+
+interface Props {
+  title: string;
+  description: string;
+  ogImage?: string;
+  contact: {
+    phone: string;
+    phoneHref: string;
+    addresses: string[];
+    billingAddress: string;
+    companyId: string;
+    taxId: string;
+    facebook: string;
+    instagram: string;
+  };
+  jsonLd: Record<string, unknown>[];
+}
+
+const { title, description, ogImage, contact, jsonLd } = Astro.props;
+---
+
+<BaseLayout title={title} description={description} ogImage={ogImage} contact={contact} jsonLd={jsonLd}>
+  <article class="bg-white px-6 pb-20 pt-32">
+    <div class="prose prose-lg mx-auto max-w-3xl">
+      <slot />
+    </div>
+  </article>
+</BaseLayout>
