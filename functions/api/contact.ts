@@ -1,10 +1,13 @@
 interface Env {
   RESEND_API_KEY: string;
-  CONTACT_TO_EMAIL: string;
-  CONTACT_FROM_EMAIL: string;
+  CONTACT_TO_EMAIL?: string;
+  CONTACT_FROM_EMAIL?: string;
   TURNSTILE_SECRET_KEY: string;
   CONTACT_RATE_LIMIT?: string;
 }
+
+const defaultContactToEmail = 'kotrasovapetra@seznam.cz';
+const defaultContactFromEmail = 'mirek@thesivak.net';
 
 type FormValues = {
   name: string;
@@ -155,6 +158,9 @@ const emailHtml = (values: FormValues) => {
 };
 
 const sendEmail = async (values: FormValues, env: Env) => {
+  const toEmail = env.CONTACT_TO_EMAIL || defaultContactToEmail;
+  const fromEmail = env.CONTACT_FROM_EMAIL || defaultContactFromEmail;
+
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -162,8 +168,8 @@ const sendEmail = async (values: FormValues, env: Env) => {
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      from: env.CONTACT_FROM_EMAIL,
-      to: [env.CONTACT_TO_EMAIL],
+      from: fromEmail,
+      to: [toEmail],
       reply_to: values.email || undefined,
       subject: `Nová poptávka: ${values.name}`,
       html: emailHtml(values),
@@ -198,7 +204,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const turnstileOk = await verifyTurnstile(values.turnstileToken, env.TURNSTILE_SECRET_KEY, ip);
     if (!turnstileOk) return genericError();
 
-    if (!env.RESEND_API_KEY || !env.CONTACT_TO_EMAIL || !env.CONTACT_FROM_EMAIL) {
+    if (!env.RESEND_API_KEY) {
       console.error('Missing contact form email environment variables.');
       return genericError();
     }
