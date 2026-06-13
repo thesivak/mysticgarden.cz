@@ -1,0 +1,2 @@
+/blog /404.html 404
+/blog/* /404.html 404

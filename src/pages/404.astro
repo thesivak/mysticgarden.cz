@@ -1,0 +1,29 @@
+---
+import { getEntry } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const home = await getEntry('pages', 'home');
+if (!home) {
+  throw new Error('Missing src/content/pages/home.md');
+}
+---
+
+<BaseLayout
+  title="Stránka nenalezena | Mystic Garden"
+  description="Požadovaná stránka na mysticgarden.cz nebyla nalezena."
+  keywords={home.data.seo.keywords}
+  ogImage={home.data.seo.ogImage}
+  contact={home.data.contact}
+  jsonLd={[]}
+>
+  <section class="flex min-h-[70vh] items-center bg-green-950 px-6 pb-20 pt-36 text-white">
+    <div class="mx-auto max-w-3xl">
+      <p class="text-sm font-semibold uppercase tracking-[0.22em] text-mystic">404</p>
+      <h1 class="mt-5 text-5xl font-semibold leading-tight md:text-7xl">Stránka nebyla nalezena</h1>
+      <p class="mt-6 text-lg leading-8 text-white/78">Obsah byl odstraněn nebo adresa neexistuje.</p>
+      <a href="/" class="mt-8 inline-flex rounded-md bg-mystic px-6 py-3 font-semibold text-green-950 transition-colors hover:bg-mystic-light">
+        Zpět na úvod
+      </a>
+    </div>
+  </section>
+</BaseLayout>
