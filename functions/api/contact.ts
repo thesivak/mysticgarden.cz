@@ -1,13 +1,29 @@
 interface Env {
-  RESEND_API_KEY: string;
+  EMAIL_RELAY_URL?: string;
+  EMAIL_RELAY_SECRET?: string;
   CONTACT_TO_EMAIL?: string;
   CONTACT_FROM_EMAIL?: string;
   TURNSTILE_SECRET_KEY: string;
   CONTACT_RATE_LIMIT?: string;
 }
 
+type EmailAddress = {
+  email: string;
+  name?: string;
+};
+
+type EmailMessage = {
+  to: string | EmailAddress | (string | EmailAddress)[];
+  from: string | EmailAddress;
+  subject: string;
+  html?: string;
+  text?: string;
+  replyTo?: string | EmailAddress;
+};
+
 const defaultContactToEmail = 'kotrasovapetra@seznam.cz';
 const defaultContactFromEmail = 'mirek@thesivak.net';
+const maxBodyBytes = 64 * 1024;
 
 type FormValues = {
   name: string;
@@ -104,6 +120,9 @@ const verifyTurnstile = async (token: string, secret: string, ip: string) => {
 };
 
 const readForm = async (request: Request): Promise<FormValues | null> => {
+  const contentLength = Number(request.headers.get('content-length') || 0);
+  if (contentLength > maxBodyBytes) return null;
+
   const formData = await request.formData();
   for (const [key, value] of formData.entries()) {
     if (!allowedFields.has(key) || typeof value !== 'string') return null;
@@ -144,33 +163,30 @@ const emailHtml = (values: FormValues) => {
     ['Typ služby', values.serviceType],
     ['Lokalita', values.location],
     ['Preferovaný kontakt', values.preferredContact],
-    ['Poptávka', values.message.replace(/\n/g, '<br>')],
+    ['Poptávka', values.message],
   ].filter(([, value]) => value);
 
   return `
     <h1>Nová poptávka z mysticgarden.cz</h1>
     <table cellpadding="8" cellspacing="0" border="0">
       ${rows
-        .map(([label, value]) => `<tr><th align="left">${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`)
+        .map(([label, value]) => `<tr><th align="left">${escapeHtml(label)}</th><td>${escapeHtml(value).replace(/\n/g, '<br>')}</td></tr>`)
         .join('')}
     </table>
   `;
 };
 
 const sendEmail = async (values: FormValues, env: Env) => {
+  if (!env.EMAIL_RELAY_URL || !env.EMAIL_RELAY_SECRET) return false;
+
   const toEmail = env.CONTACT_TO_EMAIL || defaultContactToEmail;
   const fromEmail = env.CONTACT_FROM_EMAIL || defaultContactFromEmail;
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      authorization: `Bearer ${env.RESEND_API_KEY}`,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: fromEmail,
-      to: [toEmail],
-      reply_to: values.email || undefined,
+  try {
+    const emailSent = await sendViaRelay(env, {
+      from: parseEmailAddress(fromEmail),
+      to: toEmail,
+      replyTo: values.email || undefined,
       subject: `Nová poptávka: ${values.name}`,
       html: emailHtml(values),
       text: [
@@ -185,10 +201,14 @@ const sendEmail = async (values: FormValues, env: Env) => {
       ]
         .filter(Boolean)
         .join('\n'),
-    }),
-  });
+    });
+    if (!emailSent) return false;
+  } catch (error) {
+    console.error('cloudflare_email_error', error instanceof Error ? error.message : 'unknown');
+    return false;
+  }
 
-  return response.ok;
+  return true;
 };
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
@@ -204,7 +224,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const turnstileOk = await verifyTurnstile(values.turnstileToken, env.TURNSTILE_SECRET_KEY, ip);
     if (!turnstileOk) return genericError();
 
-    if (!env.RESEND_API_KEY) {
+    if (!env.EMAIL_RELAY_URL || !env.EMAIL_RELAY_SECRET) {
       console.error('Missing contact form email environment variables.');
       return genericError();
     }
@@ -229,3 +249,21 @@ export const onRequestGet = methodNotAllowed;
 export const onRequestPut = methodNotAllowed;
 export const onRequestPatch = methodNotAllowed;
 export const onRequestDelete = methodNotAllowed;
+
+function parseEmailAddress(value: string): string | EmailAddress {
+  const match = value.match(/^\s*(.*?)\s*<([^<>]+)>\s*$/);
+  if (!match) return value.trim();
+  return { name: match[1].replace(/^"|"$/g, '').trim(), email: match[2].trim() };
+}
+
+async function sendViaRelay(env: Env, message: EmailMessage): Promise<boolean> {
+  const response = await fetch(env.EMAIL_RELAY_URL || '', {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${env.EMAIL_RELAY_SECRET}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(message),
+  });
+  return response.ok;
+}
