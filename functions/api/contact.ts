@@ -221,8 +221,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const values = await readForm(request);
     if (!values || !validate(values)) return genericError();
 
-    const turnstileOk = await verifyTurnstile(values.turnstileToken, env.TURNSTILE_SECRET_KEY, ip);
-    if (!turnstileOk) return genericError();
+    if (values.turnstileToken) {
+      const turnstileOk = await verifyTurnstile(values.turnstileToken, env.TURNSTILE_SECRET_KEY, ip);
+      if (!turnstileOk) return genericError();
+    }
 
     if (!env.EMAIL_RELAY_URL || !env.EMAIL_RELAY_SECRET) {
       console.error('Missing contact form email environment variables.');
